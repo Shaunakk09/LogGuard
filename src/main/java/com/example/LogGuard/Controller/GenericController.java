@@ -68,7 +68,6 @@ public class GenericController {
     public void updateUser(@RequestBody User user){
          userService.addUser(user);
     }
-
     @PostMapping("/add/dummy/user")
     public void saveDummyUser(){
         for(int i = 1;i <= 100; i++){
