@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -43,21 +44,23 @@ public class GenericController {
     }
 
     @GetMapping("/user/{mid}")
-    @Cacheable(value = "user",key = "#mid")
-    public User fetchUserbyId(@PathVariable(value = "mid") Integer mid) {
-        User user = userService.fetchUserById(mid).get();
-        log.info("User " + user.getFirstName() + " fetched from the database.");
+    public User fetchUserbyId(@PathVariable(value = "mid") Integer mid,@RequestParam(required = false) String flag) throws SQLException {
+        if(flag != null){
+            if(flag.equals("failedConnectionToCache")) userService.failedConnectionToCache();
+            else if(flag.equals("failedConnectionToDb")) userService.failedConnectionToDb();
+            else if(flag.equals("increasedLatencyForDb")) return userService.fetchUserById(mid,true);
+            return null;
+        }
+        User user = userService.fetchUserById(mid,false);
         return user;
     }
 
     @DeleteMapping("/user/{mid}")
     @CacheEvict(value = "user",key = "#mid")
-    public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid){
+    public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid) throws SQLException {
         if(userService.userExistById(mid)) {
-            Optional<User> user = userService.fetchUserById(mid);
-            String firstName = user.get().getFirstName();
-            userService.deleteById(mid);
-            log.info("User " + firstName +" Deleted from Db.");
+            User user = userService.fetchUserById(mid,false);
+            userService.deleteById(user);
             return ResponseEntity.ok("User Deleted successfully");
         }
         else  return  ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
@@ -77,5 +80,10 @@ public class GenericController {
             User user = new User(i,faker.name().firstName(),faker.name().lastName(),r.nextInt(100-1)+1);
             userService.addUser(user);
         }
+    }
+
+    @PostMapping("/user/{flag}")
+    public void errorProduction(@PathVariable(value = "flag") String flag) throws SQLException, ClassNotFoundException, InterruptedException {
+        if(flag.equals("dbConnectonTimeOut")) userService.dbConnectonTimeOut();
     }
 }

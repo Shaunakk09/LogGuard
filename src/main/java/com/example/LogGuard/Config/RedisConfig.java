@@ -9,6 +9,8 @@ import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.*;
 
+
+
 @Configuration
 @EnableCaching
 public class RedisConfig {
