@@ -88,7 +88,6 @@ public class GenericController {
         else if(flag.equals("failedConnectionToDb")) userService.failedConnectionToDb();
         else if(flag.equals("increasedLatencyForDb") && !userService.userExistInCache(mid))
             return userService.fetchUserById(mid,true);
-        else if(flag.equals("dbConnectonTimeOut")) userService.dbConnectonTimeOut();
         else if(fetchedFromCache.equals(true) && flag.equals("increasedLatencyForCache")) {
             Thread.sleep(5000L);
             User user = userService.fetchUserById(mid,false);
@@ -96,6 +95,7 @@ public class GenericController {
             log.info("Increased latency of Redis operation.");
             return user;
         }
+        else if(flag.equals("dbConnectonTimeOut")) userService.dbConnectonTimeOut();
         return null;
     }
 }
