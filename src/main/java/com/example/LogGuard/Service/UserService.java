@@ -9,9 +9,10 @@ import java.util.Optional;
 public interface UserService {
     void addUser(User user);
     List<User> fetchAllUser();
-    User fetchUserById(int mid,Boolean check) throws SQLException;
+    User fetchUserById(int mid,Boolean check) throws SQLException, InterruptedException;
     Boolean userExistById(int mid);
     void deleteById(User user);
+    Boolean userExistInCache(int mid);
     void redisTimeOut();
     void failedConnectionToDb() throws SQLException;
     void failedConnectionToCache();

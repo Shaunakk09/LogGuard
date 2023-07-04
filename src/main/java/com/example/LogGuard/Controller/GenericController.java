@@ -44,20 +44,21 @@ public class GenericController {
     }
 
     @GetMapping("/user/{mid}")
-    public User fetchUserbyId(@PathVariable(value = "mid") Integer mid,@RequestParam(required = false) String flag) throws SQLException {
+    public User fetchUserbyId(@PathVariable(value = "mid") Integer mid,@RequestParam(required = false) String flag) throws SQLException, InterruptedException, ClassNotFoundException {
+        Boolean fetchedFromCache = false;
+        if(userService.userExistInCache(mid)) fetchedFromCache = true;
+        long startTime = System.currentTimeMillis();
         if(flag != null){
-            if(flag.equals("failedConnectionToCache")) userService.failedConnectionToCache();
-            else if(flag.equals("failedConnectionToDb")) userService.failedConnectionToDb();
-            else if(flag.equals("increasedLatencyForDb")) return userService.fetchUserById(mid,true);
-            return null;
+            return flagChecker(flag,mid,fetchedFromCache,startTime);
         }
         User user = userService.fetchUserById(mid,false);
+        if(fetchedFromCache.equals(true)) log.info("User fetched from Redis cache. Operation executed in {} ms",System.currentTimeMillis() - startTime);
         return user;
     }
 
     @DeleteMapping("/user/{mid}")
     @CacheEvict(value = "user",key = "#mid")
-    public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid) throws SQLException {
+    public ResponseEntity<String> deleteUser(@PathVariable("mid") Integer mid) throws SQLException, InterruptedException {
         if(userService.userExistById(mid)) {
             User user = userService.fetchUserById(mid,false);
             userService.deleteById(user);
@@ -82,8 +83,19 @@ public class GenericController {
         }
     }
 
-    @PostMapping("/user/{flag}")
-    public void errorProduction(@PathVariable(value = "flag") String flag) throws SQLException, ClassNotFoundException, InterruptedException {
-        if(flag.equals("dbConnectonTimeOut")) userService.dbConnectonTimeOut();
+    private User flagChecker(String flag,int mid,Boolean fetchedFromCache,long startTime) throws SQLException, InterruptedException, ClassNotFoundException {
+        if(flag.equals("failedConnectionToCache")) userService.failedConnectionToCache();
+        else if(flag.equals("failedConnectionToDb")) userService.failedConnectionToDb();
+        else if(flag.equals("increasedLatencyForDb") && !userService.userExistInCache(mid))
+            return userService.fetchUserById(mid,true);
+        else if(flag.equals("dbConnectonTimeOut")) userService.dbConnectonTimeOut();
+        else if(fetchedFromCache.equals(true) && flag.equals("increasedLatencyForCache")) {
+            Thread.sleep(5000L);
+            User user = userService.fetchUserById(mid,false);
+            log.info("User fetched from Redis cache. Operation executed in {} ms",System.currentTimeMillis() - startTime);
+            log.info("Increased latency of Redis operation.");
+            return user;
+        }
+        return null;
     }
 }

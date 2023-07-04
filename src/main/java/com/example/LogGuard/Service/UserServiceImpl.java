@@ -32,7 +32,7 @@ public class UserServiceImpl implements UserService{
     private DelayedConnectionDataSource delayedConnectionDataSource = new DelayedConnectionDataSource();
 
     @Autowired
-    RedisTemplate redisTemplate;
+    private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
     private UserDao userDao;
@@ -49,14 +49,14 @@ public class UserServiceImpl implements UserService{
 
     @Override
     @Cacheable(value = "user",key = "#mid")
-    public User fetchUserById(int mid,Boolean check) throws SQLException {
+    public User fetchUserById(int mid,Boolean check) throws SQLException, InterruptedException {
         Long startTime = System.currentTimeMillis();
-//        if(check.equals(true)){
-//            Thread.sleep(5000L);
-//        }
+        if(check.equals(true)){
+            Thread.sleep(5000L);
+        }
         Optional<User> user =  userDao.findById(mid);
         if(user != null){
-            logResponseTime(startTime,user.get());
+            logResponseTime(startTime,user.get(),check);
         }
         return user.get();
     }
@@ -76,12 +76,12 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public void failedConnectionToDb() throws SQLException {
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        dataSource.setUrl("jdbc:mysql://localhost:3306/wrongDb");
-        dataSource.setUsername("root");
-        dataSource.setPassword("Phoenix123$");
         try{
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            dataSource.setUrl("jdbc:mysql://localhost:3306/wrongDb");
+            dataSource.setUsername("root");
+            dataSource.setPassword("Phoenix123$");
             Connection connection = dataSource.getConnection();
         }
         catch(Exception e){
@@ -106,13 +106,23 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public void dbConnectonTimeOut() throws SQLException, InterruptedException {
-        DriverManagerDataSource dataSource = new DriverManagerDataSource();
-        dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        dataSource.setUrl("jdbc:mysql://localhost:3306/logDb");
-        dataSource.setUsername("root");
-        dataSource.setPassword("Phoenix123$");
-        Connection connection = delayedConnectionDataSource.getConnection();
-        log.info("Db connected successfully");
+        try{
+            DriverManagerDataSource dataSource = new DriverManagerDataSource();
+            dataSource.setDriverClassName("com.mysql.cj.jdbc.Driver");
+            dataSource.setUrl("jdbc:mysql://localhost:3306/logDb");
+            dataSource.setUsername("root");
+            dataSource.setPassword("Phoenix123$");
+            Connection connection = delayedConnectionDataSource.getConnection();
+            log.info("Db connected successfully");
+        }
+        catch(Exception e){
+            log.error("An error occurred while establishing a database connection: Connection timeout. ", e.getMessage());
+        }
+    }
+
+    @Override
+    public Boolean userExistInCache(int mid){
+        return redisTemplate.hasKey("user::"+String.valueOf(mid));
     }
 
     @Override
@@ -131,9 +141,10 @@ public class UserServiceImpl implements UserService{
         });
     }
 
-    private void logResponseTime(Long startTime,User user){
+    private void logResponseTime(Long startTime,User user,Boolean check){
         Long dbResponseTime = System.currentTimeMillis() - startTime;
         log.info("User " + user.getFirstName() + " fetched from database in time " + dbResponseTime +"ms");
+        if(check.equals(true)) log.info("Increased latency of Database operation.");
     }
 
 }
